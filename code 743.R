@@ -1,55 +1,49 @@
-# Ανάλυση Προσδιοριστικών Παραγόντων Κερδοφορίας Τραπεζών
+# analysis for banking profit
 
-## Φόρτωση απαραίτητων βιβλιοθηκών
-# Φόρτωση απαραίτητων βιβλιοθηκών
 library(tidyverse)
-library(psych)      # Για συναρτήσεις παραγοντικής ανάλυσης
-library(ggplot2)    # Για οπτικοποίηση
-library(readxl)     # Για ανάγνωση αρχείων Excel
-library(plm)        # Για ανάλυση panel data
-library(car)        # Για διαγνωστικά τεστ
-library(lmtest)     # Για διαγνωστικά τεστ
-library(sandwich)   # Για robust standard errors
-library(corrplot)   # Για γραφήματα συσχετίσεων
-library(stargazer)  # Για πίνακες αποτελεσμάτων παλινδρόμησης
+library(psych)      
+library(ggplot2)    
+library(readxl)    
+library(plm)        
+library(car)        
+library(lmtest)     
+library(sandwich)   
+library(corrplot)   
+library(stargazer)  
 
-## 1. Προετοιμασία και εξερεύνηση δεδομένων
-# Εισαγωγή δεδομένων
-data <- read_excel("datavol_encoded-final.xlsx")
+data <- read_excel("x.xlsx")
 
-# Εξέταση της δομής των δεδομένων
+# optimize data
 str(data)
 head(data)
 attach(data)
-# Έλεγχος για τυχόν ελλιπείς τιμές
+# chech for n/a or missing values
 missing_values <- colSums(is.na(data))
 print(missing_values[missing_values > 0])
 
 
 
-# Υπολογισμός Χρηματοοικονομικών Δεικτών
+# finanacial ratios
 data <- data %>%
   mutate(
-    # Προσθήκη των μεταβλητών που αναφέρονται στην εξίσωση του paper
-     # Μέγεθος τράπεζας (λογάριθμος περιουσιακών στοιχείων)
     CAP = eqtot / asset,  # Capital ratio
     LOAN = lnlsnet / asset,  # Loan ratio # Deposits to assets ratio
     LLP = lnatres/ lnlsnet  # Loan loss provisions to loans ratio
   )
 
-# Μετονομασία όλων των μεταβλητών σε ΚΕΦΑΛΑΙΑ
+# rename variables with capitals
 names(data) <- toupper(names(data))
 
 
-## 2. Περιγραφική Στατιστική Ανάλυση
-# Επιλογή των μεταβλητών ενδιαφέροντος για το μοντέλο
+
+# var from analysis with these variables
 model_vars <- c("ROA", "NIM", "SIZE", "CAP", "LOAN", "DEP", "LLP")
 
-# Αναλυτικά περιγραφικά στατιστικά
+# description statistics
 desc_stats <- describe(data[model_vars])
 print(desc_stats)
 
-# Δημιουργία πίνακα περιγραφικών στατιστικών
+# table from stats
 desc_table <- data.frame(
   Variable = rownames(desc_stats),
   Mean = desc_stats$mean,
@@ -62,18 +56,17 @@ desc_table <- data.frame(
 
 print(desc_table)
 
-# Συσχετίσεις μεταξύ των μεταβλητών
+# corellation matrix
 cor_matrix <- cor(data[model_vars], use = "pairwise.complete.obs")
 print(cor_matrix)
 
-# Οπτικοποίηση του πίνακα συσχετίσεων
+# corr plot
 corrplot(cor_matrix, method = "color", type = "upper", 
          order = "hclust", tl.col = "black", tl.srt = 45,
          addCoef.col = "black", number.cex = 0.7)
 
 
-## 3. Διαχρονική Ανάλυση Δεικτών Κερδοφορίας
-# Μέσοι όροι δεικτών κερδοφορίας ανά έτος
+## 3. mead values roa, nim
 yearly_profitability <- data %>%
   group_by(YEAR) %>%
   summarise(
@@ -81,7 +74,7 @@ yearly_profitability <- data %>%
     Avg_NIM = mean(NIM, na.rm = TRUE)
   )
 
-# Μετατροπή σε μορφή "long" για ευκολότερη οπτικοποίηση
+# log profitability
 yearly_profitability_long <- yearly_profitability %>%
   pivot_longer(
     cols = starts_with("Avg_"),
@@ -90,7 +83,7 @@ yearly_profitability_long <- yearly_profitability %>%
   ) %>%
   mutate(Indicator = gsub("Avg_", "", Indicator))
 
-# Γράφημα δεικτών κερδοφορίας
+# plot of profitabilities indexes
 ggplot(yearly_profitability_long, aes(x = YEAR, y = Value, color = Indicator, group = Indicator)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
@@ -104,7 +97,7 @@ ggplot(yearly_profitability_long, aes(x = YEAR, y = Value, color = Indicator, gr
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-# Μέσοι όροι επεξηγηματικών μεταβλητών ανά έτος
+# means other variables
 yearly_determinants <- data %>%
   group_by(YEAR) %>%
   summarise(
@@ -115,7 +108,7 @@ yearly_determinants <- data %>%
     Avg_LLP = mean(LLP, na.rm = TRUE)
   )
 
-# Μετατροπή σε μορφή "long" για ευκολότερη οπτικοποίηση
+# "long" 
 yearly_determinants_long <- yearly_determinants %>%
   pivot_longer(
     cols = starts_with("Avg_"),
@@ -124,7 +117,7 @@ yearly_determinants_long <- yearly_determinants %>%
   ) %>%
   mutate(Indicator = gsub("Avg_", "", Indicator))
 
-# Γράφημα επεξηγηματικών μεταβλητών
+# plot 
 ggplot(yearly_determinants_long, aes(x = YEAR, y = Value, color = Indicator, group = Indicator)) +
   geom_line(linewidth = 1) +
   geom_point(size = 2) +
@@ -138,74 +131,67 @@ ggplot(yearly_determinants_long, aes(x = YEAR, y = Value, color = Indicator, gro
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-## 4. Προκαταρκτική Ανάλυση με Pooled OLS
-# 1. Έλεγχος πολυσυγγραμμικότητας με VIF (Variance Inflation Factor)
+
+# 1.  VIF (Variance Inflation Factor)
 library(car)
 
-# Έλεγχος VIF για το μοντέλο ROA
 vif_roa <- vif(lm(ROA ~ SIZE + CAP + LOAN + DEP +LLP , data = data))
-print("VIF για μοντέλο ROA:")
+print("VIF model for ROA:")
 print(vif_roa)
 
-# Έλεγχος VIF για το μοντέλο NIM
 vif_nim <- vif(lm(NIM ~ SIZE + CAP + LOAN + DEP +LLP , data = data))
-print("VIF για μοντέλο NIM:")
+print("VIF model for NIM:")
 print(vif_nim)
 
-# 2. Πίνακας συσχετίσεων για να δούμε ποιες μεταβλητές συσχετίζονται έντονα
+# 2. corr matrix
 correlation_matrix <- cor(data[, c("SIZE","LLP", "CAP", "LOAN", "DEP", "ROA", "NIM")], 
                           use = "complete.obs")
 print("Πίνακας συσχετίσεων:")
 print(round(correlation_matrix, 3))
 
-# 3. Οπτικοποίηση του πίνακα συσχετίσεων
+# 3. corr plot
 library(corrplot)
 corrplot(correlation_matrix, method = "circle", type = "upper", 
          tl.col = "black", tl.srt = 45) 
 
 
 ################################3
-# 4. Προκαταρκτική Ανάλυση με Pooled OLS (Αντιμετωπίζοντας την Πολυσυγγραμμικότητα)
-
-# Η μεταβλητή LLP έχει το υψηλότερο VIF (4.70) και υψηλή συσχέτιση με DEP και NIM
-# Την αφαιρούμε πρώτα από τα μοντέλα μας
-# Pooled OLS για ROA 
+# 4.  Pooled OLS roa
 roa_pooled <- lm(ROA ~ SIZE + CAP + LOAN + DEP+ LLP, data = data)
 summary(roa_pooled)
 
-# Pooled OLS για NIM 
+# Pooled OLS NIM 
 nim_pooled <- lm(NIM ~ SIZE + CAP + LOAN + DEP+ LLP, data = data)
 summary(nim_pooled)
 
-# Έλεγχος νέων VIF για να δούμε αν επιλύθηκε το πρόβλημα
+# checking vif
 vif_roa_new <- vif(roa_pooled)
-print("VIF για το μοντέλο ROA :")
+print("VIF model for ROA :")
 print(vif_roa_new)
 
 vif_nim_new <- vif(nim_pooled)
-print("VIF για το μοντέλο NIM :")
+print("VIF model for NIM :")
 print(vif_nim_new)
 
-# Έλεγχος ετεροσκεδαστικότητας
+# heteroscedasticity
 bptest(roa_pooled)
 bptest(nim_pooled)
 
-# Διορθωμένα τυπικά σφάλματα με τη μέθοδο του White
+#  White methid
 coeftest(roa_pooled, vcov = vcovHC(roa_pooled, type = "HC1"))
 coeftest(nim_pooled, vcov = vcovHC(nim_pooled, type = "HC1"))
 
-## 5. Ανάλυση Panel Data
+## 5. analysis Panel Data
 
-# Βεβαιωθείτε ότι το NAME είναι σε κεφαλαία
 data$NAME <- toupper(data$NAME)
 
-# Κρατήστε μόνο μοναδικούς συνδυασμούς NAME + YEAR
+# keep NAME + YEAR
 data <- data %>% distinct(NAME, YEAR, .keep_all = TRUE)
 
-# Δημιουργία του panel dataset (το NAME είναι η μονάδα, το YEAR ο χρόνος)
+# make panel dataset
 pdata <- pdata.frame(data, index = c("NAME", "YEAR"))
 
-# 5.1 Panel Models για ROA 
+# 5.1 Panel Models for ROA 
 
 
 cor(pdata[, c("SIZE", "CAP", "LOAN","LLP", "DEP")]) 
@@ -217,46 +203,43 @@ summary(roa_re)
 roa_fe <- plm(ROA ~ SIZE + CAP + LOAN + LLP , 
               data = pdata, model = "within")
 summary(roa_fe)
-# Έλεγχος Hausman για επιλογή μεταξύ fixed και random effects
+# Έλεγχος Hausman for fixed and random effects
 hausman_test_roa <- phtest(roa_fe, roa_re)
 print(hausman_test_roa)
 
-# 5.2 Panel Models για NIM (χωρίς LLP)
+# 5.2 Panel Models for NIM (without LLP)
 
-# Fixed Effects Model για NIM
+# Fixed Effects Model for NIM
 nim_fe <- plm(NIM ~ SIZE + CAP + LOAN + LLP  , 
               data = pdata, model = "within")
 summary(nim_fe)
 
-# Random Effects Model για NIM
+# Random Effects Model for NIM
 nim_re <- plm(NIM ~ SIZE + CAP + LOAN + LLP ,  
               data = pdata, model = "random")
 summary(nim_re)
 
-# Έλεγχος Hausman για επιλογή μεταξύ fixed και random effects
+#  Hausman between fixed and random effects
 hausman_test_nim <- phtest(nim_fe, nim_re)
 print(hausman_test_nim)
 
-# Έλεγχος για ετεροσκεδαστικότητα σε panel models
+# heteroscedasticity
 bptest(roa_fe)
 bptest(nim_fe)
 ###################################################
-# Υπολογισμός ROE (Return on Equity) χρησιμοποιώντας ibefxtr ως proxy για Net Income
-#Δείκτης ROE (Return on Equity):Ο δείκτης απόδοσης ιδίων κεφαλαίων υπολογίστηκε ως το πηλίκο των λειτουργικών κερδών προ φόρων και έκτακτων στοιχείων προς το συνολικό ύψος ιδίων κεφαλαίων. Συγκεκριμένα, λόγω έλλειψης διαθέσιμης μεταβλητής που να αντιπροσωπεύει καθαρά κέρδη (Net Income), χρησιμοποιήθηκε η μεταβλητή IBEFXTR (income before extraordinary items and taxes) ως αποδεκτό proxy για τα καθαρά κέρδη. Ο παρονομαστής του δείκτη ήταν η μεταβλητή EQTOT (total equity capital), όπως αυτή περιγράφεται στα δεδομένα της FDIC.#
-
-
+#make roe index
 
 length(ibefxtr)
 length(eqtot)
 nrow(data)
 
 data$ROE <- data$IBEFXTR / data$EQTOT 
-# Ενημέρωση του pdata με τη νέα μεταβλητή ROE
+# add to panel data  ROE
 pdata <- pdata.frame(data, index = c("NAME", "YEAR"))
 
 print(data$ROE)
 summary(data$ROE) 
-# Random Effects Model για ROA 
+# Random Effects Model for ROA 
 cor(pdata[, c("ROE", "SIZE", "CAP", "LOAN", "LLP", "DEP")], use = "complete.obs")
 vif(lm(ROE ~ SIZE + CAP + LOAN + LLP + DEP, data = data))
 roe_re <- plm(ROE ~ SIZE + CAP + LOAN + LLP , data = pdata, model = "random")
@@ -274,27 +257,27 @@ ggplot(yearly_roe, aes(x = YEAR, y = Avg_ROE)) +
   geom_line(linewidth = 1, color = "darkred") +
   geom_point(size = 2, color = "darkred") +
   theme_minimal() +
-  labs(title = "Διαχρονική Εξέλιξη του ROE",
+  labs(title = "yearly ROE",
        x = "Έτος", y = "Μέσο ROE")
 ggplot(data, aes(x = as.factor(YEAR), y = ROE)) +
   geom_boxplot(fill = "lightblue") +
   theme_minimal() +
-  labs(title = "Boxplot του ROE ανά Έτος",
+  labs(title = "Boxplot  ROE every year",
        x = "Έτος", y = "ROE")
 ##########################NEW############################################3
 library(dplyr)
 
-# Υπολογισμός Equity/Assets
+#  Equity/Assets
 df <- data %>%
   mutate(eq_to_asset = EQTOT / ASSET)
 
-# Υπολογισμός std(ROA) ανά τράπεζα (χρησιμοποιώντας NAME)
+#  std(ROA) for every bank
 roa_sd <- df %>%
   group_by(NAME) %>%
   summarise(roa_sd = sd(ROA, na.rm = TRUE)) %>%
   ungroup()
 
-# Συγχώνευση στο αρχικό dataset
+# put alls in first dataset
 df <- df %>%
   left_join(roa_sd, by = "NAME")
 df <- df %>%
@@ -305,11 +288,11 @@ df <- df %>%
     z_score = (ROA + eq_to_asset) / roa_sd
   )
 
-# Τελικός υπολογισμός Z-score
+# calculate Z-score
 df <- df %>%
   mutate(z_score = (ROA + eq_to_asset) / roa_sd)
 
-# Προβολή αποτελεσμάτων
+# results
 head(df %>% select(NAME, YEAR, ROA, eq_to_asset, roa_sd, z_score))
 library(plm)
 
